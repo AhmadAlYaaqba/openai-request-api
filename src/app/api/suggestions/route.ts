@@ -34,12 +34,29 @@ const fieldGuidance: Record<SuggestionField, string> = {
     'Lead with the immediate need for assistance and connect it to day-to-day realities. Highlight how support would be used. Avoid greetings or introductions.'
 }
 
+const corsHeaders: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+}
+
+const withCors = (response: NextResponse) => {
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+  return response
+}
+
+export function OPTIONS() {
+  return withCors(new NextResponse(null, { status: 204 }))
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as RequestBody
 
     if (!body?.field || !body?.language) {
-      return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 })
+      return withCors(NextResponse.json({ error: 'Missing required fields.' }, { status: 400 }))
     }
 
     const controller = new AbortController()
@@ -84,21 +101,23 @@ export async function POST(request: NextRequest) {
         typeof errorPayload?.error?.message === 'string'
           ? errorPayload.error.message
           : 'Unable to generate suggestion.'
-      return NextResponse.json({ error: message }, { status: response.status })
+      return withCors(NextResponse.json({ error: message }, { status: response.status }))
     }
 
     const data = await response.json()
     const content: string | undefined = data?.choices?.[0]?.message?.content
 
     if (!content) {
-      return NextResponse.json({ error: 'No suggestion received.' }, { status: 500 })
+      return withCors(NextResponse.json({ error: 'No suggestion received.' }, { status: 500 }))
     }
 
-    return NextResponse.json({ suggestion: content.trim() })
+    return withCors(NextResponse.json({ suggestion: content.trim() }))
   } catch (error) {
     if ((error as Error).name === 'AbortError') {
-      return NextResponse.json({ error: 'The request timed out.' }, { status: 504 })
+      return withCors(NextResponse.json({ error: 'The request timed out.' }, { status: 504 }))
     }
-    return NextResponse.json({ error: (error as Error).message ?? 'Unable to generate suggestion.' }, { status: 500 })
+    return withCors(
+      NextResponse.json({ error: (error as Error).message ?? 'Unable to generate suggestion.' }, { status: 500 })
+    )
   }
 }
